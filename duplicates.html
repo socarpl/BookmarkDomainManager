@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Duplicated Bookmarks</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      background-color: #f8f9fa;
+    }
+
+    .controls {
+      margin-bottom: 20px;
+    }
+
+    button {
+      padding: 8px 16px;
+      margin-right: 10px;
+      border: none;
+      border-radius: 4px;
+      background-color: #e9ecef;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    button:hover {
+      background-color: #dee2e6;
+    }
+
+    .url-group {
+      background-color: white;
+      border-radius: 8px;
+      margin-bottom: 16px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .url-header {
+      padding: 12px 16px;
+      background-color: #f8f9fa;
+      border-radius: 8px 8px 0 0;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .header-content {
+      flex-grow: 1;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+    }
+
+    .url-text {
+      font-weight: 500;
+      color: #1a73e8;
+    }
+
+    .duplicate-count {
+      color: #5f6368;
+    }
+
+    .open-button {
+      padding: 6px 12px;
+      margin: 0 0 0 16px;
+      background-color: #1a73e8;
+      color: white;
+      border-radius: 4px;
+      font-size: 13px;
+    }
+
+    .open-button:hover {
+      background-color: #1557b0;
+    }
+
+    .bookmark-table {
+      width: 100%;
+      border-collapse: collapse;
+      display: none;
+    }
+
+    .bookmark-table.show {
+      display: table;
+    }
+
+    .bookmark-table th,
+    .bookmark-table td {
+      padding: 12px 16px;
+      text-align: left;
+      border-bottom: 1px solid #e9ecef;
+    }
+
+    .bookmark-table th {
+      background-color: #f8f9fa;
+      font-weight: 500;
+      color: #5f6368;
+    }
+
+    .action-buttons {
+      display: flex;
+      gap: 8px;
+    }
+
+    .delete-button {
+      padding: 4px 8px;
+      background-color: #dc3545;
+      color: white;
+      font-size: 12px;
+    }
+
+    .delete-button:hover {
+      background-color: #c82333;
+    }
+
+    .loading-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: rgba(255, 255, 255, 0.9);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+    }
+
+    .loading-text {
+      margin-bottom: 16px;
+      font-size: 18px;
+      color: #1a73e8;
+    }
+
+    .progress-text {
+      font-size: 14px;
+      color: #5f6368;
+    }
+
+    .no-duplicates {
+      text-align: center;
+      padding: 32px;
+      color: #5f6368;
+      font-size: 16px;
+    }
+  </style>
+</head>
+<body>
+  <div class="controls">
+    <button id="expandAll">Expand All</button>
+    <button id="collapseAll">Collapse All</button>
+  </div>
+
+  <div id="duplicates-container"></div>
+
+  <div id="loadingContainer" class="loading-container">
+    <div class="loading-text">Finding duplicates...</div>
+    <div id="progressText" class="progress-text">0% complete</div>
+  </div>
+
+  <script src="duplicates.js"></script>
+</body>
+</html> 
