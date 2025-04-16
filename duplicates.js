@@ -179,7 +179,7 @@ function displayDuplicates() {
 
       const duplicateUrls = Object.entries(bookmarksByUrl)
         .filter(([_, bookmarks]) => bookmarks.length > 1)
-        .sort(([a], [b]) => a.localeCompare(b));
+        .sort(([_, a], [__, b]) => b.length - a.length);  // Sort by number of duplicates in descending order
 
       if (duplicateUrls.length === 0) {
         container.innerHTML = '<div class="no-duplicates">No duplicate bookmarks found.</div>';
@@ -211,9 +211,42 @@ function displayDuplicates() {
         openButton.textContent = 'Open';
         openButton.addEventListener('click', (e) => openUrl(url, e));
         
-        // Add header content and button to header
+        // Create Remove Duplicates button
+        const removeDuplicatesButton = document.createElement('button');
+        removeDuplicatesButton.className = 'remove-duplicates-button';
+        removeDuplicatesButton.textContent = 'Remove Duplicates';
+        removeDuplicatesButton.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const duplicatesToRemove = bookmarks.length - 1;
+          if (confirm(`Are you sure you want to remove ${duplicatesToRemove} duplicate bookmarks? The first bookmark will be kept.`)) {
+            try {
+              // Keep the first bookmark, remove the rest
+              for (let i = 1; i < bookmarks.length; i++) {
+                await chrome.bookmarks.remove(bookmarks[i].id);
+              }
+              
+              // Remove the current group from the view immediately
+              urlGroup.remove();
+              
+              // Check if there are no more duplicate groups
+              const container = document.getElementById('duplicates-container');
+              if (!container.querySelector('.url-group')) {
+                container.innerHTML = '<div class="no-duplicates">No duplicate bookmarks found.</div>';
+              }
+              
+              // Refresh the entire view to ensure consistency
+              displayDuplicates();
+            } catch (error) {
+              console.error('Error removing duplicates:', error);
+              alert('Failed to remove duplicates. Please try again.');
+            }
+          }
+        });
+        
+        // Add header content and buttons to header
         header.appendChild(headerContent);
         header.appendChild(openButton);
+        header.appendChild(removeDuplicatesButton);
         
         const table = createBookmarkTable(bookmarks, urlGroup, url);
         

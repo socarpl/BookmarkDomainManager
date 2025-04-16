@@ -66,6 +66,9 @@ async function deleteBookmark(bookmarkId, row, domain, domainGroup) {
         const countSpan = domainGroup.querySelector('.domain-header span:last-child');
         countSpan.textContent = `${domain} (${remainingRows})`;
       }
+      
+      // Refresh statistics
+      await displayBookmarks();
     } catch (error) {
       console.error('Error deleting bookmark:', error);
       alert('Failed to delete bookmark. Please try again.');
@@ -209,6 +212,9 @@ function showMoveModal(bookmarkId, row, domain, domainGroup) {
       locationCell.textContent = newLocation;
       
       closeModal();
+      
+      // Refresh statistics
+      await displayBookmarks();
     } catch (error) {
       console.error('Error moving bookmark:', error);
       alert('Failed to move bookmark. Please try again.');
@@ -285,145 +291,147 @@ function updateProgress(percent, message) {
   } else if (percent === 100) {
     setTimeout(() => {
       loadingContainer.style.display = 'none';
-    }, 500); // Keep visible briefly to show completion
+    }, 500);
   }
 }
 
 // Function to export bookmarks
 function exportBookmarks(bookmarksByDomain) {
-  let content = 'Bookmarks by Domain\n\n';
-  
-  Object.entries(bookmarksByDomain)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .forEach(([domain, bookmarks]) => {
-      content += `${domain} (${bookmarks.length} bookmarks)\n`;
-      content += '='.repeat(50) + '\n\n';
-      
-      bookmarks.forEach(bookmark => {
-        content += `Title: ${bookmark.title || bookmark.url}\n`;
-        content += `URL: ${bookmark.url}\n`;
-        content += `Location: ${bookmark.location}\n`;
-        content += `Added: ${bookmark.dateAdded}\n`;
-        content += '-'.repeat(30) + '\n\n';
-      });
-      
-      content += '\n';
+  // Create HTML content in Netscape Bookmark File Format
+  let htmlContent = `<!DOCTYPE NETSCAPE-Bookmark-file-1>
+<!-- This is an automatically generated file.
+     It will be read and overwritten.
+     DO NOT EDIT! -->
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=UTF-8">
+<TITLE>Bookmarks</TITLE>
+<H1>Bookmarks</H1>
+<DL><p>
+`;
+
+  // Sort domains alphabetically
+  const sortedDomains = Object.entries(bookmarksByDomain).sort(([a], [b]) => a.localeCompare(b));
+
+  // Add bookmarks for each domain
+  sortedDomains.forEach(([domain, bookmarks]) => {
+    // Add domain as a folder
+    htmlContent += `    <DT><H3 ADD_DATE="0" LAST_MODIFIED="0">${domain}</H3>\n`;
+    htmlContent += `    <DL><p>\n`;
+
+    // Add bookmarks in this domain
+    bookmarks.forEach(bookmark => {
+      const addDate = Math.floor(bookmark.dateAdded / 1000); // Convert to Unix timestamp
+      htmlContent += `        <DT><A HREF="${bookmark.url}" ADD_DATE="${addDate}" LAST_MODIFIED="${addDate}">${bookmark.title || bookmark.url}</A>\n`;
     });
-    
-  // Create blob and download
-  const blob = new Blob([content], { type: 'text/plain' });
+
+    htmlContent += `    </DL><p>\n`;
+  });
+
+  htmlContent += `</DL><p>`;
+
+  // Create and download the file
+  const blob = new Blob([htmlContent], { type: 'text/html' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `bookmarks_export_${new Date().toISOString().split('T')[0]}.txt`;
+  a.download = 'bookmarks.html';
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
 
-// Main function to organize and display bookmarks
-function displayBookmarks() {
+// Function to update statistics
+function updateStatistics(bookmarksByDomain) {
+  const domainCount = Object.keys(bookmarksByDomain).length;
+  const totalBookmarks = Object.values(bookmarksByDomain).reduce((sum, bookmarks) => sum + bookmarks.length, 0);
+  
+  document.getElementById('domainCount').textContent = domainCount;
+  document.getElementById('bookmarkCount').textContent = totalBookmarks;
+}
+
+// Function to display bookmarks
+async function displayBookmarks() {
   updateProgress(0, 'Loading bookmarks...');
-
-  chrome.bookmarks.getTree(async (bookmarkTreeNodes) => {
-    try {
-      // Flatten the bookmark tree while preserving hierarchy information
-      const allBookmarks = [];
-      function processNode(node) {
-        if (node.url) {
-          allBookmarks.push(node);
-        }
-        if (node.children) {
-          node.children.forEach(processNode);
-        }
+  const container = document.getElementById('bookmarks-container');
+  container.innerHTML = '';
+  
+  try {
+    const tree = await new Promise(resolve => chrome.bookmarks.getTree(resolve));
+    const bookmarksByDomain = {};
+    
+    function processNode(node) {
+      if (node.url) {
+        bookmarksByDomain[extractDomain(node.url)] = bookmarksByDomain[extractDomain(node.url)] || [];
+        bookmarksByDomain[extractDomain(node.url)].push({
+          ...node,
+          location: getFolderPath(node, tree),
+          dateAdded: formatDate(node.dateAdded)
+        });
       }
-      bookmarkTreeNodes.forEach(processNode);
-      
-      updateProgress(20, 'Processing bookmarks...');
-
-      // Group bookmarks by domain
-      const bookmarksByDomain = {};
-      let processed = 0;
-      const total = allBookmarks.length;
-      
-      for (const bookmark of allBookmarks) {
-        if (bookmark.url) {
-          const domain = extractDomain(bookmark.url);
-          if (!bookmarksByDomain[domain]) {
-            bookmarksByDomain[domain] = [];
-          }
-          bookmarksByDomain[domain].push({
-            ...bookmark,
-            location: getFolderPath(bookmark, bookmarkTreeNodes),
-            dateAdded: formatDate(bookmark.dateAdded)
-          });
-        }
-        
-        processed++;
-        // Update progress from 20% to 70%
-        const percent = 20 + (processed / total * 50);
-        updateProgress(percent, 'Organizing bookmarks...');
+      if (node.children) {
+        node.children.forEach(processNode);
       }
-      
-      updateProgress(70, 'Creating bookmark groups...');
-
-      // Create and append domain groups
-      const container = document.getElementById('bookmarks-container');
-      const domainGroups = [];  // Store references to all groups for expand/collapse all
-
-      const sortedDomains = Object.entries(bookmarksByDomain).sort(([a], [b]) => a.localeCompare(b));
-      const totalDomains = sortedDomains.length;
-      
-      sortedDomains.forEach(([domain, bookmarks], index) => {
-        const domainGroup = document.createElement('div');
-        domainGroup.className = 'domain-group';
-        
-        const header = document.createElement('div');
-        header.className = 'domain-header';
-        header.innerHTML = `
-          <span class="expand-icon">[+]</span>
-          <span>${domain} (${bookmarks.length})</span>
-        `;
-        
-        const table = createBookmarkTable(bookmarks, domainGroup, domain);
-        
-        header.addEventListener('click', () => toggleTable(header, table));
-        
-        domainGroup.appendChild(header);
-        domainGroup.appendChild(table);
-        container.appendChild(domainGroup);
-
-        // Store reference to header and table for expand/collapse all
-        domainGroups.push({ header, table });
-        
-        // Update progress from 70% to 100%
-        const percent = 70 + ((index + 1) / totalDomains * 30);
-        updateProgress(percent, 'Finalizing display...');
-      });
-
-      // Add expand/collapse all functionality
-      document.getElementById('expandAll').addEventListener('click', () => {
-        domainGroups.forEach(group => toggleTable(group.header, group.table, true));
-      });
-
-      document.getElementById('collapseAll').addEventListener('click', () => {
-        domainGroups.forEach(group => toggleTable(group.header, group.table, false));
-      });
-
-      // Add export functionality
-      document.getElementById('exportBtn').addEventListener('click', () => {
-        exportBookmarks(bookmarksByDomain);
-      });
-      
-      updateProgress(100, 'Complete!');
-      
-    } catch (error) {
-      console.error('Error processing bookmarks:', error);
-      alert('An error occurred while loading bookmarks. Please try refreshing the page.');
-      updateProgress(100, 'Error occurred!');
     }
-  });
+    processNode(tree[0]);
+    
+    updateProgress(50, 'Processing bookmarks...');
+    
+    // Update statistics
+    updateStatistics(bookmarksByDomain);
+    
+    // Sort domains alphabetically
+    const sortedDomains = Object.entries(bookmarksByDomain).sort(([a], [b]) => a.localeCompare(b));
+    const totalDomains = sortedDomains.length;
+    
+    // Create and append domain groups
+    const domainGroups = [];  // Store references to all groups for expand/collapse all
+    
+    sortedDomains.forEach(([domain, bookmarks], index) => {
+      const domainGroup = document.createElement('div');
+      domainGroup.className = 'domain-group';
+      
+      const header = document.createElement('div');
+      header.className = 'domain-header';
+      header.innerHTML = `
+        <span class="expand-icon">[+]</span>
+        <span>${domain} (${bookmarks.length})</span>
+      `;
+      
+      const table = createBookmarkTable(bookmarks, domainGroup, domain);
+      
+      header.addEventListener('click', () => toggleTable(header, table));
+      
+      domainGroup.appendChild(header);
+      domainGroup.appendChild(table);
+      container.appendChild(domainGroup);
+      
+      domainGroups.push({ header, table });
+      
+      const percent = 50 + ((index + 1) / totalDomains * 50);
+      updateProgress(percent, 'Creating bookmark groups...');
+    });
+    
+    // Add expand/collapse all functionality
+    document.getElementById('expandAll').addEventListener('click', () => {
+      domainGroups.forEach(group => toggleTable(group.header, group.table, true));
+    });
+    
+    document.getElementById('collapseAll').addEventListener('click', () => {
+      domainGroups.forEach(group => toggleTable(group.header, group.table, false));
+    });
+    
+    // Add export functionality
+    document.getElementById('exportBtn').addEventListener('click', () => {
+      exportBookmarks(bookmarksByDomain);
+    });
+    
+    updateProgress(100, 'Complete!');
+    
+  } catch (error) {
+    console.error('Error displaying bookmarks:', error);
+    alert('An error occurred while loading bookmarks. Please try refreshing the page.');
+    updateProgress(100, 'Error occurred!');
+  }
 }
 
 // Initialize the display when the page loads
