@@ -324,6 +324,77 @@
       border-color: #0d6efd;
       box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
     }
+    .grouping-container {
+      display: inline-block;
+      margin-left: 20px;
+      font-size: 14px;
+      color: #666;
+    }
+    .grouping-label {
+      margin-right: 10px;
+    }
+    .grouping-dropdown {
+      padding: 4px 8px;
+      border: 1px solid #dee2e6;
+      border-radius: 4px;
+      background-color: white;
+      font-size: 14px;
+      color: #495057;
+      cursor: pointer;
+    }
+    .grouping-dropdown:hover {
+      border-color: #adb5bd;
+    }
+    .grouping-dropdown:focus {
+      outline: none;
+      border-color: #0d6efd;
+      box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+    }
+    .year-group {
+      margin-bottom: 20px;
+      background-color: white;
+      border-radius: 5px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .year-header {
+      padding: 12px 15px;
+      background-color: #e9ecef;
+      border-radius: 5px 5px 0 0;
+      font-weight: bold;
+      font-size: 16px;
+      color: #495057;
+      border-bottom: 2px solid #dee2e6;
+    }
+    .year-navigation {
+      margin: 20px 0;
+      padding: 15px;
+      background-color: #f8f9fa;
+      border-radius: 5px;
+      border: 1px solid #dee2e6;
+    }
+    .year-jump-label {
+      font-weight: bold;
+      margin-right: 10px;
+      color: #495057;
+    }
+    .year-jump-dropdown {
+      padding: 6px 12px;
+      border: 1px solid #dee2e6;
+      border-radius: 4px;
+      background-color: white;
+      font-size: 14px;
+      color: #495057;
+      cursor: pointer;
+      min-width: 150px;
+    }
+    .year-jump-dropdown:hover {
+      border-color: #adb5bd;
+    }
+    .year-jump-dropdown:focus {
+      outline: none;
+      border-color: #0d6efd;
+      box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+    }
   </style>
 </head>
 <body>
@@ -339,6 +410,13 @@
             <option value="alphabetically">Alphabetically</option>
             <option value="ascending">Ascending count</option>
             <option value="descending">Descending count</option>
+          </select>
+        </span>
+        <span class="grouping-container">
+          <label for="groupingDropdown" class="grouping-label">Grouping:</label>
+          <select id="groupingDropdown" class="grouping-dropdown">
+            <option value="domain">By domain</option>
+            <option value="year">By year</option>
           </select>
         </span>
       </div>
@@ -362,6 +440,14 @@
     <div class="spinner"></div>
     <div class="loading-text">Loading bookmarks...</div>
     <div id="progressText" class="progress-text">Processing... (0%)</div>
+  </div>
+
+  <!-- Year Navigation (shown only when grouping by year) -->
+  <div id="yearNavigation" class="year-navigation" style="display: none;">
+    <label for="yearJumpDropdown" class="year-jump-label">Jump to year:</label>
+    <select id="yearJumpDropdown" class="year-jump-dropdown">
+      <option value="">Select a year...</option>
+    </select>
   </div>
 
   <div id="bookmarks-container"></div>

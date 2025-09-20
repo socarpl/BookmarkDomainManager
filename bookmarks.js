@@ -411,8 +411,13 @@ async function displayBookmarks() {
     // Update statistics
     updateStatistics(bookmarksByDomain);
     
-    // Get sorting method from dropdown
+    // Get sorting method and grouping method from dropdowns
     const sortMethod = document.getElementById('sortDropdown').value;
+    const groupingMethod = document.getElementById('groupingDropdown').value;
+    
+    // Hide year navigation by default
+    const yearNavigation = document.getElementById('yearNavigation');
+    yearNavigation.style.display = 'none';
     
     // Sort domains based on selected method
     let sortedDomains;
@@ -439,6 +444,159 @@ async function displayBookmarks() {
       default:
         sortedDomains = Object.entries(bookmarksByDomain).sort(([a], [b]) => a.localeCompare(b));
     }
+    
+    // Group by year if selected
+    if (groupingMethod === 'year') {
+      // Show year navigation
+      const yearNavigation = document.getElementById('yearNavigation');
+      yearNavigation.style.display = 'block';
+      
+      // Group all bookmarks by year
+      const bookmarksByYear = {};
+      
+      // We need to get the original bookmark data with timestamps
+      const tree = await new Promise(resolve => chrome.bookmarks.getTree(resolve));
+      const allBookmarks = [];
+      
+      function collectBookmarks(node) {
+        if (node.url) {
+          allBookmarks.push(node);
+        }
+        if (node.children) {
+          node.children.forEach(collectBookmarks);
+        }
+      }
+      collectBookmarks(tree[0]);
+      
+      allBookmarks.forEach(bookmark => {
+        const year = new Date(bookmark.dateAdded).getFullYear();
+        if (!bookmarksByYear[year]) {
+          bookmarksByYear[year] = [];
+        }
+        bookmarksByYear[year].push({
+          ...bookmark,
+          location: getFolderPath(bookmark, tree),
+          dateAdded: formatDate(bookmark.dateAdded)
+        });
+      });
+      
+      // Sort years in descending order (newest first)
+      const sortedYears = Object.keys(bookmarksByYear).sort((a, b) => b - a);
+      
+      // Populate year navigation dropdown
+      const yearJumpDropdown = document.getElementById('yearJumpDropdown');
+      yearJumpDropdown.innerHTML = '<option value="">Select a year...</option>';
+      sortedYears.forEach(year => {
+        const option = document.createElement('option');
+        option.value = year;
+        option.textContent = year;
+        yearJumpDropdown.appendChild(option);
+      });
+      
+      // Add year jump functionality
+      yearJumpDropdown.addEventListener('change', (e) => {
+        const selectedYear = e.target.value;
+        if (selectedYear) {
+          const yearElement = document.querySelector(`[data-year="${selectedYear}"]`);
+          if (yearElement) {
+            yearElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        }
+      });
+      
+      // Create year groups
+      sortedYears.forEach((year, yearIndex) => {
+        const yearGroup = document.createElement('div');
+        yearGroup.className = 'year-group';
+        yearGroup.setAttribute('data-year', year); // Add data attribute for navigation
+        
+        const yearHeader = document.createElement('div');
+        yearHeader.className = 'year-header';
+        yearHeader.textContent = `Bookmarks from ${year}`;
+        yearGroup.appendChild(yearHeader);
+        
+        // Update progress
+        const yearProgress = 50 + ((yearIndex + 1) / sortedYears.length * 30);
+        updateProgress(yearProgress, 'Creating year groups...');
+        
+        // Sort bookmarks within this year by domain
+        const yearBookmarks = bookmarksByYear[year];
+        const yearBookmarksByDomain = {};
+        yearBookmarks.forEach(bookmark => {
+          const domain = extractDomain(bookmark.url);
+          if (!yearBookmarksByDomain[domain]) {
+            yearBookmarksByDomain[domain] = [];
+          }
+          yearBookmarksByDomain[domain].push(bookmark);
+        });
+        
+        // Sort domains within this year
+        const yearDomains = Object.entries(yearBookmarksByDomain);
+        let sortedYearDomains;
+        switch (sortMethod) {
+          case 'alphabetically':
+            sortedYearDomains = yearDomains.sort(([a], [b]) => a.localeCompare(b));
+            break;
+          case 'ascending':
+            sortedYearDomains = yearDomains.sort(([a, bookmarksA], [b, bookmarksB]) => {
+              if (bookmarksA.length !== bookmarksB.length) {
+                return bookmarksB.length - bookmarksA.length;
+              }
+              return a.localeCompare(b);
+            });
+            break;
+          case 'descending':
+            sortedYearDomains = yearDomains.sort(([a, bookmarksA], [b, bookmarksB]) => {
+              if (bookmarksA.length !== bookmarksB.length) {
+                return bookmarksA.length - bookmarksB.length;
+              }
+              return a.localeCompare(b);
+            });
+            break;
+          default:
+            sortedYearDomains = yearDomains.sort(([a], [b]) => a.localeCompare(b));
+        }
+        
+        // Create domain groups within this year
+        sortedYearDomains.forEach(([domain, bookmarks]) => {
+          const domainGroup = document.createElement('div');
+          domainGroup.className = 'domain-group';
+          
+          const header = document.createElement('div');
+          header.className = 'domain-header';
+          header.innerHTML = `
+            <div class="domain-header-content">
+              <span class="expand-icon">[+]</span>
+              <span>${domain} (${bookmarks.length})</span>
+            </div>
+            <button class="domain-delete-button">Delete All</button>
+          `;
+          
+          const table = createBookmarkTable(bookmarks, domainGroup, domain);
+          
+          // Add click handler for the header content (not the delete button)
+          const headerContent = header.querySelector('.domain-header-content');
+          headerContent.addEventListener('click', () => toggleTable(header, table));
+          
+          // Add click handler for the domain delete button
+          const domainDeleteButton = header.querySelector('.domain-delete-button');
+          domainDeleteButton.addEventListener('click', (e) => {
+            e.stopPropagation();
+            deleteDomainGroup(domainGroup, domain);
+          });
+          
+          domainGroup.appendChild(header);
+          domainGroup.appendChild(table);
+          yearGroup.appendChild(domainGroup);
+        });
+        
+        container.appendChild(yearGroup);
+      });
+      
+      updateProgress(100, 'Complete!');
+      return; // Exit early for year grouping
+    }
+    
     const totalDomains = sortedDomains.length;
     
     // Create and append domain groups
@@ -497,6 +655,11 @@ async function displayBookmarks() {
     
     // Add sorting change handler
     document.getElementById('sortDropdown').addEventListener('change', () => {
+      displayBookmarks();
+    });
+    
+    // Add grouping change handler
+    document.getElementById('groupingDropdown').addEventListener('change', () => {
       displayBookmarks();
     });
     
