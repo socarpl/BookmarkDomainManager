@@ -76,6 +76,37 @@ async function deleteBookmark(bookmarkId, row, domain, domainGroup) {
   }
 }
 
+// Function to delete all bookmarks in a domain group
+async function deleteDomainGroup(domainGroup, domain) {
+  const shouldConfirm = document.getElementById('confirmDelete').checked;
+  const bookmarkCount = domainGroup.querySelectorAll('table tr').length - 1; // -1 for header row
+  
+  if (!shouldConfirm || confirm(`Are you sure you want to delete all ${bookmarkCount} bookmarks from ${domain}?`)) {
+    try {
+      // Get all bookmark IDs from the domain group
+      const bookmarkRows = domainGroup.querySelectorAll('table tr:not(:first-child)');
+      const bookmarkIds = Array.from(bookmarkRows).map(row => {
+        const deleteButton = row.querySelector('.delete-button');
+        return deleteButton.dataset.bookmarkId;
+      });
+      
+      // Delete all bookmarks
+      for (const bookmarkId of bookmarkIds) {
+        await chrome.bookmarks.remove(bookmarkId);
+      }
+      
+      // Remove the entire domain group
+      domainGroup.remove();
+      
+      // Refresh statistics
+      await displayBookmarks();
+    } catch (error) {
+      console.error('Error deleting domain group:', error);
+      alert('Failed to delete domain group. Please try again.');
+    }
+  }
+}
+
 // Function to build folder tree
 function buildFolderTree(node, level = 0) {
   if (!node) return '';
@@ -266,6 +297,7 @@ function createBookmarkTable(bookmarks, domainGroup, domain) {
     
     // Add delete functionality
     const deleteButton = row.querySelector('.delete-button');
+    deleteButton.dataset.bookmarkId = bookmark.id;
     deleteButton.addEventListener('click', (e) => {
       e.stopPropagation();
       deleteBookmark(bookmark.id, row, domain, domainGroup);
@@ -393,13 +425,25 @@ async function displayBookmarks() {
       const header = document.createElement('div');
       header.className = 'domain-header';
       header.innerHTML = `
-        <span class="expand-icon">[+]</span>
-        <span>${domain} (${bookmarks.length})</span>
+        <div class="domain-header-content">
+          <span class="expand-icon">[+]</span>
+          <span>${domain} (${bookmarks.length})</span>
+        </div>
+        <button class="domain-delete-button">Delete All</button>
       `;
       
       const table = createBookmarkTable(bookmarks, domainGroup, domain);
       
-      header.addEventListener('click', () => toggleTable(header, table));
+      // Add click handler for the header content (not the delete button)
+      const headerContent = header.querySelector('.domain-header-content');
+      headerContent.addEventListener('click', () => toggleTable(header, table));
+      
+      // Add click handler for the domain delete button
+      const domainDeleteButton = header.querySelector('.domain-delete-button');
+      domainDeleteButton.addEventListener('click', (e) => {
+        e.stopPropagation();
+        deleteDomainGroup(domainGroup, domain);
+      });
       
       domainGroup.appendChild(header);
       domainGroup.appendChild(table);
