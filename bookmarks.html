@@ -307,11 +307,22 @@
     .sort-label {
       margin-right: 10px;
     }
-    .sort-option {
-      margin-right: 15px;
+    .sort-dropdown {
+      padding: 4px 8px;
+      border: 1px solid #dee2e6;
+      border-radius: 4px;
+      background-color: white;
+      font-size: 14px;
+      color: #495057;
+      cursor: pointer;
     }
-    .sort-option input {
-      margin-right: 5px;
+    .sort-dropdown:hover {
+      border-color: #adb5bd;
+    }
+    .sort-dropdown:focus {
+      outline: none;
+      border-color: #0d6efd;
+      box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
     }
   </style>
 </head>
@@ -323,16 +334,12 @@
         <span class="stats-item">Domains: <span id="domainCount">0</span></span>
         <span class="stats-item">Total Bookmarks: <span id="bookmarkCount">0</span></span>
         <span class="sort-container">
-          <span class="sort-label">Sort by:</span>
-          <label class="sort-option">
-            <input type="radio" name="sort" value="alphabetically" checked> Alphabetically
-          </label>
-          <label class="sort-option">
-            <input type="radio" name="sort" value="ascending"> Ascending number
-          </label>
-          <label class="sort-option">
-            <input type="radio" name="sort" value="descending"> Descending number
-          </label>
+          <label for="sortDropdown" class="sort-label">Sorting:</label>
+          <select id="sortDropdown" class="sort-dropdown">
+            <option value="alphabetically">Alphabetically</option>
+            <option value="ascending">Ascending count</option>
+            <option value="descending">Descending count</option>
+          </select>
         </span>
       </div>
     </div>

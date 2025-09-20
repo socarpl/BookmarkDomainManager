@@ -411,8 +411,34 @@ async function displayBookmarks() {
     // Update statistics
     updateStatistics(bookmarksByDomain);
     
-    // Sort domains alphabetically
-    const sortedDomains = Object.entries(bookmarksByDomain).sort(([a], [b]) => a.localeCompare(b));
+    // Get sorting method from dropdown
+    const sortMethod = document.getElementById('sortDropdown').value;
+    
+    // Sort domains based on selected method
+    let sortedDomains;
+    switch (sortMethod) {
+      case 'alphabetically':
+        sortedDomains = Object.entries(bookmarksByDomain).sort(([a], [b]) => a.localeCompare(b));
+        break;
+      case 'ascending':
+        sortedDomains = Object.entries(bookmarksByDomain).sort(([a, bookmarksA], [b, bookmarksB]) => {
+          if (bookmarksA.length !== bookmarksB.length) {
+            return bookmarksB.length - bookmarksA.length; // Most bookmarks first
+          }
+          return a.localeCompare(b); // Alphabetically if same count
+        });
+        break;
+      case 'descending':
+        sortedDomains = Object.entries(bookmarksByDomain).sort(([a, bookmarksA], [b, bookmarksB]) => {
+          if (bookmarksA.length !== bookmarksB.length) {
+            return bookmarksA.length - bookmarksB.length; // Least bookmarks first
+          }
+          return a.localeCompare(b); // Alphabetically if same count
+        });
+        break;
+      default:
+        sortedDomains = Object.entries(bookmarksByDomain).sort(([a], [b]) => a.localeCompare(b));
+    }
     const totalDomains = sortedDomains.length;
     
     // Create and append domain groups
@@ -467,6 +493,11 @@ async function displayBookmarks() {
     // Add export functionality
     document.getElementById('exportBtn').addEventListener('click', () => {
       exportBookmarks(bookmarksByDomain);
+    });
+    
+    // Add sorting change handler
+    document.getElementById('sortDropdown').addEventListener('change', () => {
+      displayBookmarks();
     });
     
     updateProgress(100, 'Complete!');
