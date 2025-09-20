@@ -67,8 +67,8 @@ async function deleteBookmark(bookmarkId, row, domain, domainGroup) {
         countSpan.textContent = `${domain} (${remainingRows})`;
       }
       
-      // Refresh statistics
-      await displayBookmarks();
+      // Update statistics without reloading
+      updateStatisticsFromCurrentView();
     } catch (error) {
       console.error('Error deleting bookmark:', error);
       alert('Failed to delete bookmark. Please try again.');
@@ -98,8 +98,8 @@ async function deleteDomainGroup(domainGroup, domain) {
       // Remove the entire domain group
       domainGroup.remove();
       
-      // Refresh statistics
-      await displayBookmarks();
+      // Update statistics without reloading
+      updateStatisticsFromCurrentView();
     } catch (error) {
       console.error('Error deleting domain group:', error);
       alert('Failed to delete domain group. Please try again.');
@@ -244,8 +244,8 @@ function showMoveModal(bookmarkId, row, domain, domainGroup) {
       
       closeModal();
       
-      // Refresh statistics
-      await displayBookmarks();
+      // Update statistics without reloading
+      updateStatisticsFromCurrentView();
     } catch (error) {
       console.error('Error moving bookmark:', error);
       alert('Failed to move bookmark. Please try again.');
@@ -379,6 +379,40 @@ function updateStatistics(bookmarksByDomain) {
   
   document.getElementById('domainCount').textContent = domainCount;
   document.getElementById('bookmarkCount').textContent = totalBookmarks;
+}
+
+// Function to update statistics from current DOM without reloading
+function updateStatisticsFromCurrentView() {
+  const container = document.getElementById('bookmarks-container');
+  const groupingMethod = document.getElementById('groupingDropdown').value;
+  
+  if (groupingMethod === 'year') {
+    // For year grouping, count year groups and all bookmarks within them
+    const yearGroups = container.querySelectorAll('.year-group');
+    const domainCount = yearGroups.length;
+    let totalBookmarks = 0;
+    
+    yearGroups.forEach(yearGroup => {
+      const domainGroups = yearGroup.querySelectorAll('.domain-group');
+      totalBookmarks += domainGroups.length;
+    });
+    
+    document.getElementById('domainCount').textContent = domainCount;
+    document.getElementById('bookmarkCount').textContent = totalBookmarks;
+  } else {
+    // For domain grouping, count domain groups and bookmarks
+    const domainGroups = container.querySelectorAll('.domain-group');
+    const domainCount = domainGroups.length;
+    let totalBookmarks = 0;
+    
+    domainGroups.forEach(domainGroup => {
+      const bookmarkRows = domainGroup.querySelectorAll('table tr:not(:first-child)');
+      totalBookmarks += bookmarkRows.length;
+    });
+    
+    document.getElementById('domainCount').textContent = domainCount;
+    document.getElementById('bookmarkCount').textContent = totalBookmarks;
+  }
 }
 
 // Function to display bookmarks
@@ -610,8 +644,8 @@ async function displayBookmarks() {
       header.className = 'domain-header';
       header.innerHTML = `
         <div class="domain-header-content">
-          <span class="expand-icon">[+]</span>
-          <span>${domain} (${bookmarks.length})</span>
+        <span class="expand-icon">[+]</span>
+        <span>${domain} (${bookmarks.length})</span>
         </div>
         <button class="domain-delete-button">Delete All</button>
       `;
