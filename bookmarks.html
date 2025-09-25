@@ -102,17 +102,32 @@
       background-color: #c82333;
     }
     .domain-delete-button {
-      padding: 6px 12px;
+      padding: 6px 10px;
       background-color: #dc3545;
       color: white;
       border: none;
       border-radius: 3px;
       cursor: pointer;
-      font-size: 12px;
-      margin-left: 10px;
+      font-size: 14px;
+      line-height: 1;
+      margin-left: 6px;
     }
     .domain-delete-button:hover {
       background-color: #c82333;
+    }
+    .domain-save-button {
+      padding: 6px 10px;
+      background-color: #6c757d;
+      color: white;
+      border: none;
+      border-radius: 3px;
+      cursor: pointer;
+      font-size: 14px;
+      line-height: 1;
+      margin-left: 6px;
+    }
+    .domain-save-button:hover {
+      background-color: #5c636a;
     }
     .domain-header-content {
       display: flex;
@@ -364,6 +379,23 @@
       font-size: 16px;
       color: #495057;
       border-bottom: 2px solid #dee2e6;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+    }
+    .year-header:hover {
+      background-color: #d6d8db;
+    }
+    .year-expand-icon {
+      margin-right: 10px;
+      font-weight: bold;
+      font-size: 14px;
+    }
+    .year-content {
+      display: none;
+    }
+    .year-content.show {
+      display: block;
     }
     .year-navigation {
       margin: 20px 0;

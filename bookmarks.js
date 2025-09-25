@@ -49,6 +49,13 @@ function toggleTable(header, table, forceState = null) {
   header.querySelector('.expand-icon').textContent = isExpanded ? '[+]' : '[-]';
 }
 
+// Function to toggle year content visibility
+function toggleYearContent(header, content, forceState = null) {
+  const isExpanded = forceState !== null ? !forceState : content.classList.contains('show');
+  content.classList.toggle('show', !isExpanded);
+  header.querySelector('.year-expand-icon').textContent = isExpanded ? '[+]' : '[-]';
+}
+
 // Function to delete bookmark
 async function deleteBookmark(bookmarkId, row, domain, domainGroup) {
   const shouldConfirm = document.getElementById('confirmDelete').checked;
@@ -372,6 +379,53 @@ function exportBookmarks(bookmarksByDomain) {
   URL.revokeObjectURL(url);
 }
 
+// Helper to create a safe filename
+function toSafeFilename(name) {
+  return String(name).replace(/[^a-zA-Z0-9._-]+/g, '_');
+}
+
+// Function to export a single domain group's bookmarks via downloads API (with fallback)
+async function exportDomainGroup(domain, bookmarks) {
+  let htmlContent = `<!DOCTYPE NETSCAPE-Bookmark-file-1>
+<!-- This is an automatically generated file.
+     It will be read and overwritten.
+     DO NOT EDIT! -->
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=UTF-8">
+<TITLE>${domain}</TITLE>
+<H1>${domain}</H1>
+<DL><p>
+`;    
+  // Add bookmarks for the domain
+  bookmarks.forEach(b => {
+    const addDate = Math.floor(new Date(b.dateAdded).getTime() / 1000) || 0;
+    const title = b.title || b.url;
+    htmlContent += `    <DT><A HREF="${b.url}" ADD_DATE="${addDate}" LAST_MODIFIED="${addDate}">${title}</A>\n`;
+  });
+  htmlContent += `</DL><p>`;
+
+  const blob = new Blob([htmlContent], { type: 'text/html' });
+  const blobUrl = URL.createObjectURL(blob);
+  const filename = `${toSafeFilename(domain)}.html`;
+
+  // Use downloads API when available; otherwise fall back to anchor download
+  const hasDownloads = typeof chrome !== 'undefined' && chrome.downloads && typeof chrome.downloads.download === 'function';
+  if (hasDownloads) {
+    try {
+      await chrome.downloads.download({ url: blobUrl, filename, saveAs: true });
+    } finally {
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+    }
+  } else {
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+  }
+}
+
 // Function to update statistics
 function updateStatistics(bookmarksByDomain) {
   const domainCount = Object.keys(bookmarksByDomain).length;
@@ -546,8 +600,16 @@ async function displayBookmarks() {
         
         const yearHeader = document.createElement('div');
         yearHeader.className = 'year-header';
-        yearHeader.textContent = `Bookmarks from ${year}`;
+        yearHeader.innerHTML = `
+          <span class="year-expand-icon">[+]</span>
+          <span>Bookmarks from ${year}</span>
+        `;
         yearGroup.appendChild(yearHeader);
+        
+        // Create year content container
+        const yearContent = document.createElement('div');
+        yearContent.className = 'year-content';
+        yearGroup.appendChild(yearContent);
         
         // Update progress
         const yearProgress = 50 + ((yearIndex + 1) / sortedYears.length * 30);
@@ -603,7 +665,10 @@ async function displayBookmarks() {
               <span class="expand-icon">[+]</span>
               <span>${domain} (${bookmarks.length})</span>
             </div>
-            <button class="domain-delete-button">Delete All</button>
+            <div>
+              <button class="domain-save-button" title="Save" aria-label="Save">&#128190;</button>
+              <button class="domain-delete-button" title="Delete All" aria-label="Delete All">&#128465;</button>
+            </div>
           `;
           
           const table = createBookmarkTable(bookmarks, domainGroup, domain);
@@ -618,11 +683,21 @@ async function displayBookmarks() {
             e.stopPropagation();
             deleteDomainGroup(domainGroup, domain);
           });
+
+          // Add click handler for the domain save button
+          const domainSaveButton = header.querySelector('.domain-save-button');
+          domainSaveButton.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            await exportDomainGroup(domain, bookmarks);
+          });
           
           domainGroup.appendChild(header);
           domainGroup.appendChild(table);
-          yearGroup.appendChild(domainGroup);
+          yearContent.appendChild(domainGroup);
         });
+        
+        // Add click handler for year header collapse/expand
+        yearHeader.addEventListener('click', () => toggleYearContent(yearHeader, yearContent));
         
         container.appendChild(yearGroup);
       });
@@ -647,7 +722,10 @@ async function displayBookmarks() {
         <span class="expand-icon">[+]</span>
         <span>${domain} (${bookmarks.length})</span>
         </div>
-        <button class="domain-delete-button">Delete All</button>
+        <div>
+          <button class="domain-save-button" title="Save" aria-label="Save">&#128190;</button>
+          <button class="domain-delete-button" title="Delete All" aria-label="Delete All">&#128465;</button>
+        </div>
       `;
       
       const table = createBookmarkTable(bookmarks, domainGroup, domain);
@@ -662,6 +740,13 @@ async function displayBookmarks() {
         e.stopPropagation();
         deleteDomainGroup(domainGroup, domain);
       });
+
+      // Add click handler for the domain save button
+      const domainSaveButton = header.querySelector('.domain-save-button');
+      domainSaveButton.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        await exportDomainGroup(domain, bookmarks);
+      });
       
       domainGroup.appendChild(header);
       domainGroup.appendChild(table);
@@ -675,11 +760,41 @@ async function displayBookmarks() {
     
     // Add expand/collapse all functionality
     document.getElementById('expandAll').addEventListener('click', () => {
-      domainGroups.forEach(group => toggleTable(group.header, group.table, true));
+      if (groupingMethod === 'year') {
+        // For year grouping, expand all year groups and their domain groups
+        const yearGroups = container.querySelectorAll('.year-group');
+        yearGroups.forEach(yearGroup => {
+          const yearHeader = yearGroup.querySelector('.year-header');
+          const yearContent = yearGroup.querySelector('.year-content');
+          toggleYearContent(yearHeader, yearContent, true);
+          
+          // Also expand all domain groups within this year
+          const domainGroups = yearContent.querySelectorAll('.domain-group');
+          domainGroups.forEach(domainGroup => {
+            const header = domainGroup.querySelector('.domain-header');
+            const table = domainGroup.querySelector('.bookmark-table');
+            toggleTable(header, table, true);
+          });
+        });
+      } else {
+        // For domain grouping, expand all domain groups
+        domainGroups.forEach(group => toggleTable(group.header, group.table, true));
+      }
     });
     
     document.getElementById('collapseAll').addEventListener('click', () => {
-      domainGroups.forEach(group => toggleTable(group.header, group.table, false));
+      if (groupingMethod === 'year') {
+        // For year grouping, collapse all year groups
+        const yearGroups = container.querySelectorAll('.year-group');
+        yearGroups.forEach(yearGroup => {
+          const yearHeader = yearGroup.querySelector('.year-header');
+          const yearContent = yearGroup.querySelector('.year-content');
+          toggleYearContent(yearHeader, yearContent, false);
+        });
+      } else {
+        // For domain grouping, collapse all domain groups
+        domainGroups.forEach(group => toggleTable(group.header, group.table, false));
+      }
     });
     
     // Add export functionality
