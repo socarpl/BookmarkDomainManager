@@ -778,7 +778,7 @@ async function displayBookmarks() {
         });
       } else {
         // For domain grouping, expand all domain groups
-        domainGroups.forEach(group => toggleTable(group.header, group.table, true));
+      domainGroups.forEach(group => toggleTable(group.header, group.table, true));
       }
     });
     
@@ -793,7 +793,7 @@ async function displayBookmarks() {
         });
       } else {
         // For domain grouping, collapse all domain groups
-        domainGroups.forEach(group => toggleTable(group.header, group.table, false));
+      domainGroups.forEach(group => toggleTable(group.header, group.table, false));
       }
     });
     
